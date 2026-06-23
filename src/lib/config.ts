@@ -34,13 +34,21 @@ export function defaultConfigPath(): string {
  */
 export function loadConfig(options: LoadConfigOptions = {}): Config {
   const env = options.env ?? process.env;
-  const profile = options.profile ?? env.TESTSPRITE_PROFILE ?? DEFAULT_PROFILE;
+  // Normalize empty / whitespace-only env vars to unset. `??` only catches
+  // null/undefined, so `export TESTSPRITE_API_URL=` (empty string) would
+  // otherwise win the precedence chain over a real default/profile value
+  // instead of falling through. Mirrors the same guard already applied in
+  // auth.ts (runConfigure) and init.ts for TESTSPRITE_API_URL/API_KEY.
+  const envProfile = env.TESTSPRITE_PROFILE?.trim() || undefined;
+  const envApiUrl = env.TESTSPRITE_API_URL?.trim() || undefined;
+  const envApiKey = env.TESTSPRITE_API_KEY?.trim() || undefined;
+  const profile = options.profile ?? envProfile ?? DEFAULT_PROFILE;
   const credentialsPath = options.credentialsPath ?? defaultCredentialsPath();
   const fileEntry = readProfile(profile, { path: credentialsPath });
 
   return {
-    apiUrl: options.endpointUrl ?? env.TESTSPRITE_API_URL ?? fileEntry?.apiUrl ?? DEFAULT_API_URL,
-    apiKey: env.TESTSPRITE_API_KEY ?? fileEntry?.apiKey,
+    apiUrl: options.endpointUrl ?? envApiUrl ?? fileEntry?.apiUrl ?? DEFAULT_API_URL,
+    apiKey: envApiKey ?? fileEntry?.apiKey,
     profile,
   };
 }

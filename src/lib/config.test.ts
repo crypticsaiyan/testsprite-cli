@@ -81,6 +81,37 @@ describe('loadConfig', () => {
     const config = loadConfig({ profile: 'dev', env: {}, credentialsPath });
     expect(config.apiKey).toBe('sk-dev');
   });
+
+  // Regression: `export TESTSPRITE_API_URL=` (empty string) is non-nullish,
+  // so `??` previously let it win the precedence chain over the file/default
+  // instead of falling through, breaking `new URL('' + path)` for every
+  // command. Empty/whitespace-only env vars must be treated as unset.
+  it('falls through to the file when TESTSPRITE_API_URL is an empty string', () => {
+    writeProfile('default', { apiUrl: 'https://from-file.example.com' }, { path: credentialsPath });
+    const config = loadConfig({ env: { TESTSPRITE_API_URL: '' }, credentialsPath });
+    expect(config.apiUrl).toBe('https://from-file.example.com');
+  });
+
+  it('falls through to the built-in default when TESTSPRITE_API_URL is whitespace-only', () => {
+    const config = loadConfig({ env: { TESTSPRITE_API_URL: '   ' }, credentialsPath });
+    expect(config.apiUrl).toBe('https://api.testsprite.com');
+  });
+
+  // Regression: an empty TESTSPRITE_API_KEY used to shadow a valid
+  // credentials-file key, producing a spurious AUTH_REQUIRED instead of
+  // falling through to the file.
+  it('falls through to the file when TESTSPRITE_API_KEY is an empty string', () => {
+    writeProfile('default', { apiKey: 'sk-from-file' }, { path: credentialsPath });
+    const config = loadConfig({ env: { TESTSPRITE_API_KEY: '' }, credentialsPath });
+    expect(config.apiKey).toBe('sk-from-file');
+  });
+
+  // Regression: an empty TESTSPRITE_PROFILE used to select the literal
+  // empty-string profile instead of falling through to "default".
+  it('falls through to "default" when TESTSPRITE_PROFILE is an empty string', () => {
+    const config = loadConfig({ env: { TESTSPRITE_PROFILE: '' }, credentialsPath });
+    expect(config.profile).toBe('default');
+  });
 });
 
 describe('defaultConfigPath', () => {
